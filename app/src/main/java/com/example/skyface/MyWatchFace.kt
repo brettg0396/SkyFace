@@ -148,21 +148,27 @@ class MyWatchFace : CanvasWatchFaceService() {
             val sky_width: Int = season_img.width
             val sky_height: Int = season_img.height
             val sky_box: Int = sky_height - sky_width
-            val sky_rate: Float = sky_box.toFloat()/6/60
+            val sky_diff: Float = sky_box.toFloat()/6
+            val sky_rate: Float = sky_diff/60
             var hour: Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
             var time: Float = when{
                 hour < 4 -> 0f
-                hour in 4..9 -> (hour-4)*sky_width + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
-                hour in 16..21 -> sky_box - ((hour - 16)*sky_width) + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
+                hour in 4..9 -> (hour-4)*sky_diff + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
+                hour in 16..21 -> (sky_box - ((hour - 16)*sky_diff)) - Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
                 hour > 21 -> 0f
                 else -> sky_box.toFloat()
             }
             time = when{
-                sky_box.toFloat()-time < sky_rate && hour in 4..9 -> sky_box.toFloat()
-                time < sky_rate && hour in 16..21 -> sky_box.toFloat()
+                hour in 4..9 -> when {
+                    (sky_box.toFloat()-time < sky_rate) || time > sky_box -> sky_box.toFloat()
+                    else -> time
+                }
+                hour in 16..21 -> when {
+                    (time < sky_rate) || time < 0 -> 0f
+                    else -> time
+                }
                 else -> time
             }
-            println(sky_width)
             season_img = Bitmap.createBitmap(season_img, 0, time.roundToInt(),sky_width, sky_width)
             var result: Bitmap = Bitmap.createBitmap(star_img.width, star_img.height, star_img.getConfig());
             var canvas: Canvas = Canvas(result);
