@@ -25,6 +25,7 @@ import android.widget.Toast
 import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.TimeZone
+import kotlin.math.roundToInt
 
 /**
  * Updates rate in milliseconds for interactive mode. We update once a second to advance the
@@ -133,11 +134,50 @@ class MyWatchFace : CanvasWatchFaceService() {
             initializeWatchFace()
         }
 
+        private fun getBackground(): Bitmap {
+            val star_img: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.stars)
+            var season_img: Bitmap = when(Calendar.getInstance().get(Calendar.MONTH)) {
+                in 0..1 -> BitmapFactory.decodeResource(resources, R.drawable.sky_winter)
+                in 2..4 -> BitmapFactory.decodeResource(resources, R.drawable.sky_spring)
+                in 5..7 -> BitmapFactory.decodeResource(resources, R.drawable.sky_summer)
+                in 8..10 -> BitmapFactory.decodeResource(resources, R.drawable.sky_fall)
+                11 -> BitmapFactory.decodeResource(resources, R.drawable.sky_winter)
+                else -> BitmapFactory.decodeResource(resources, R.drawable.sky_spring)
+            }
+
+            val sky_width: Int = season_img.width
+            val sky_height: Int = season_img.height
+            val sky_box: Int = sky_height - sky_width
+            val sky_rate: Float = sky_box.toFloat()/6/60
+            var hour: Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            var time: Float = when{
+                hour < 4 -> 0f
+                hour in 4..9 -> (hour-4)*sky_width + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
+                hour in 16..21 -> sky_box - ((hour - 16)*sky_width) + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
+                hour > 21 -> 0f
+                else -> sky_box.toFloat()
+            }
+            time = when{
+                sky_box.toFloat()-time < sky_rate && hour in 4..9 -> sky_box.toFloat()
+                time < sky_rate && hour in 16..21 -> sky_box.toFloat()
+                else -> time
+            }
+            println(sky_width)
+            season_img = Bitmap.createBitmap(season_img, 0, time.roundToInt(),sky_width, sky_width)
+            var result: Bitmap = Bitmap.createBitmap(star_img.width, star_img.height, star_img.getConfig());
+            var canvas: Canvas = Canvas(result);
+            canvas.drawBitmap(star_img, 0f, 0f, null);
+            canvas.drawBitmap(season_img, 0f, 0f, null);
+            return result;
+
+            }
+
         private fun initializeBackground() {
             mBackgroundPaint = Paint().apply {
                 color = Color.BLACK
             }
-            mBackgroundBitmap = BitmapFactory.decodeResource(resources, R.drawable.bg)
+
+            mBackgroundBitmap = getBackground()
 
             /* Extracts colors from background image to improve watchface style. */
             Palette.from(mBackgroundBitmap).generate {
@@ -481,6 +521,8 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             /* Check and trigger whether or not timer should be running (only in active mode). */
             updateTimer()
+            initializeBackground()
+            initGrayBackgroundBitmap()
         }
 
         private fun registerReceiver() {
