@@ -15,13 +15,19 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
+import android.content.pm.PackageManager
 import android.support.v7.graphics.Palette
 import android.support.wearable.watchface.CanvasWatchFaceService
 import android.support.wearable.watchface.WatchFaceService
 import android.support.wearable.watchface.WatchFaceStyle
 import android.view.SurfaceHolder
 import android.widget.Toast
-
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import android.location.Location
+import com.example.skyface.utils.Sky
+import java.util.Timer
+import java.util.TimerTask
 import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.TimeZone
@@ -45,6 +51,7 @@ private const val SECOND_TICK_STROKE_WIDTH = 2f
 private const val CENTER_GAP_AND_CIRCLE_RADIUS = 4f
 
 private const val SHADOW_RADIUS = 6f
+private const val WEATHER_INTERVAL: Long = 1000*60*20 // 20 minutes (in ms)
 
 /**
  * Analog watch face with a ticking second hand. In ambient mode, the second hand isn't
@@ -60,6 +67,7 @@ private const val SHADOW_RADIUS = 6f
  * https://codelabs.developers.google.com/codelabs/watchface/index.html#0
  */
 class MyWatchFace : CanvasWatchFaceService() {
+
 
     override fun onCreateEngine(): Engine {
         return Engine()
@@ -80,7 +88,19 @@ class MyWatchFace : CanvasWatchFaceService() {
 
     inner class Engine : CanvasWatchFaceService.Engine() {
 
+        private var SkyImage: Sky = Sky(applicationContext)
+        internal lateinit var clock: Timer
+
+        private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+        internal inner class GetLastLocation : TimerTask() {
+            override fun run() {
+                fusedLocationClient.lastLocation
+            }
+        }
+
         private lateinit var mCalendar: Calendar
+        private var myLocation: Location? = null
 
         private var mRegisteredTimeZoneReceiver = false
         private var mMuteMode: Boolean = false
@@ -118,9 +138,28 @@ class MyWatchFace : CanvasWatchFaceService() {
                 invalidate()
             }
         }
+        private fun hasGps(): Boolean =
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)
 
         override fun onCreate(holder: SurfaceHolder) {
+
             super.onCreate(holder)
+
+            clock = Timer()
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location: Location? ->
+                    if(location!=null) {
+                        //Write your implemenation here
+                        myLocation = location
+                        SkyImage.setLocation(location)
+                        SkyImage.setWeather()
+                        SkyImage.setForecast()
+                    }
+                    SkyImage.setDate()
+                }
+            fusedLocationClient.lastLocation
+            clock.schedule(GetLastLocation(), WEATHER_INTERVAL)
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -134,56 +173,12 @@ class MyWatchFace : CanvasWatchFaceService() {
             initializeWatchFace()
         }
 
-        private fun getBackground(): Bitmap {
-            val star_img: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.stars)
-            var season_img: Bitmap = when(Calendar.getInstance().get(Calendar.MONTH)) {
-                in 0..1 -> BitmapFactory.decodeResource(resources, R.drawable.sky_winter)
-                in 2..4 -> BitmapFactory.decodeResource(resources, R.drawable.sky_spring)
-                in 5..7 -> BitmapFactory.decodeResource(resources, R.drawable.sky_summer)
-                in 8..10 -> BitmapFactory.decodeResource(resources, R.drawable.sky_fall)
-                11 -> BitmapFactory.decodeResource(resources, R.drawable.sky_winter)
-                else -> BitmapFactory.decodeResource(resources, R.drawable.sky_spring)
-            }
-
-            val sky_width: Int = season_img.width
-            val sky_height: Int = season_img.height
-            val sky_box: Int = sky_height - sky_width
-            val sky_diff: Float = sky_box.toFloat()/6
-            val sky_rate: Float = sky_diff/60
-            var hour: Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            var time: Float = when{
-                hour < 4 -> 0f
-                hour in 4..9 -> (hour-4)*sky_diff + Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
-                hour in 16..21 -> (sky_box - ((hour - 16)*sky_diff)) - Calendar.getInstance().get(Calendar.MINUTE)*sky_rate
-                hour > 21 -> 0f
-                else -> sky_box.toFloat()
-            }
-            time = when{
-                hour in 4..9 -> when {
-                    (sky_box.toFloat()-time < sky_rate) || time > sky_box -> sky_box.toFloat()
-                    else -> time
-                }
-                hour in 16..21 -> when {
-                    (time < sky_rate) || time < 0 -> 0f
-                    else -> time
-                }
-                else -> time
-            }
-            season_img = Bitmap.createBitmap(season_img, 0, time.roundToInt(),sky_width, sky_width)
-            var result: Bitmap = Bitmap.createBitmap(star_img.width, star_img.height, star_img.getConfig());
-            var canvas: Canvas = Canvas(result);
-            canvas.drawBitmap(star_img, 0f, 0f, null);
-            canvas.drawBitmap(season_img, 0f, 0f, null);
-            return result;
-
-            }
-
         private fun initializeBackground() {
             mBackgroundPaint = Paint().apply {
                 color = Color.BLACK
             }
 
-            mBackgroundBitmap = getBackground()
+            mBackgroundBitmap = SkyImage.getSkyImage()
 
             /* Extracts colors from background image to improve watchface style. */
             Palette.from(mBackgroundBitmap).generate {
@@ -404,8 +399,12 @@ class MyWatchFace : CanvasWatchFaceService() {
                 WatchFaceService.TAP_TYPE_TAP ->
                     // The user has completed the tap gesture.
                     // TODO: Add code to handle the tap gesture.
-                    Toast.makeText(applicationContext, R.string.message, Toast.LENGTH_SHORT)
+                {
+                    var message: String = SkyImage.getWeather()?.name ?: "Could not get location"
+                    Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT)
                         .show()
+
+                }
             }
             invalidate()
         }
@@ -527,6 +526,10 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             /* Check and trigger whether or not timer should be running (only in active mode). */
             updateTimer()
+
+            /**
+             * Ensure sky imagery is current when visibility of the watch face updates.
+             */
             initializeBackground()
             initGrayBackgroundBitmap()
         }
