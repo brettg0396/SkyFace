@@ -26,12 +26,9 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import android.location.Location
 import com.example.skyface.utils.Sky
-import java.util.Timer
-import java.util.TimerTask
 import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.TimeZone
-import kotlin.math.roundToInt
 
 /**
  * Updates rate in milliseconds for interactive mode. We update once a second to advance the
@@ -137,18 +134,7 @@ class MyWatchFace : CanvasWatchFaceService() {
             super.onCreate(holder)
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location: Location? ->
-                    if(location!=null) {
-                        //Write your implemenation here
-                        myLocation = location
-                        SkyImage.setLocation(location)
-                        SkyImage.setWeather()
-                        SkyImage.setForecast()
-                    }
-                    SkyImage.setDate()
-                }
-            fusedLocationClient.lastLocation
+            getLastLocation()
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -160,6 +146,21 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             initializeBackground()
             initializeWatchFace()
+        }
+
+        private fun getLastLocation()
+        {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location: Location? ->
+                    if(location!=null) {
+                        //Write your implemenation here
+                        myLocation = location
+                        SkyImage.setLocation(location)
+                        SkyImage.setWeather()
+                        SkyImage.setForecast()
+                    }
+                    SkyImage.setDate()
+                }
         }
 
         private fun initializeBackground() {
@@ -389,6 +390,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // The user has completed the tap gesture.
                     // TODO: Add code to handle the tap gesture.
                 {
+                    getLastLocation()
                     var message: String = SkyImage.getWeather()?.let {
                         "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
                     } ?: "Could not get location"
@@ -510,9 +512,12 @@ class MyWatchFace : CanvasWatchFaceService() {
                 registerReceiver()
                 /* Update time zone in case it changed while we weren't visible. */
                 mCalendar.timeZone = TimeZone.getDefault()
+                /**
+                 * Ensure sky imagery and weather are current when visibility of the watch face updates.
+                 */
                 invalidate()
                 if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
-                    fusedLocationClient.lastLocation
+                    getLastLocation()
                 }
                 initializeBackground()
                 initGrayBackgroundBitmap()
@@ -522,10 +527,6 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             /* Check and trigger whether or not timer should be running (only in active mode). */
             updateTimer()
-
-            /**
-             * Ensure sky imagery is current when visibility of the watch face updates.
-             */
         }
 
         private fun registerReceiver() {

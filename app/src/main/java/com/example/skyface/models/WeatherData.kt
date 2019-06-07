@@ -47,7 +47,7 @@ data class Main(
     @SerializedName("temp_max") val temp_max: Float,
     @SerializedName("sea_level") val sea_level: Float,
     @SerializedName("grnd_level") val grnd_level: Float,
-    @SerializedName("temp_kf") val temp_kf: Int
+    @SerializedName("temp_kf") val temp_kf: Float
 )
 
 data class Wind(

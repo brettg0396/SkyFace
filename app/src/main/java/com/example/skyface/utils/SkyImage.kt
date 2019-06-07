@@ -72,7 +72,7 @@ class Sky(context: Context){
         Weather?.let {
             if (it.dt * 1000 >= solar.today) {
                 if (it.sys.sunrise*1000 != solar.dawn.set || it.sys.sunset*1000 != solar.dusk.set) {
-                    updateSolar(it.sys.sunrise*1000, it.sys.sunset*1000, date)
+                    updateSolar(it.sys.sunrise*1000, it.sys.sunset*1000, date.clone() as Calendar)
                 }
                 weatherCode = it.weather[0].id
             }
