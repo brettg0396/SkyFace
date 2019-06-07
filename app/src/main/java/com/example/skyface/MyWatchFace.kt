@@ -89,15 +89,8 @@ class MyWatchFace : CanvasWatchFaceService() {
     inner class Engine : CanvasWatchFaceService.Engine() {
 
         private var SkyImage: Sky = Sky(applicationContext)
-        internal lateinit var clock: Timer
 
         private lateinit var fusedLocationClient: FusedLocationProviderClient
-
-        internal inner class GetLastLocation : TimerTask() {
-            override fun run() {
-                fusedLocationClient.lastLocation
-            }
-        }
 
         private lateinit var mCalendar: Calendar
         private var myLocation: Location? = null
@@ -138,14 +131,11 @@ class MyWatchFace : CanvasWatchFaceService() {
                 invalidate()
             }
         }
-        private fun hasGps(): Boolean =
-            packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)
 
         override fun onCreate(holder: SurfaceHolder) {
 
             super.onCreate(holder)
 
-            clock = Timer()
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
             fusedLocationClient.lastLocation
                 .addOnSuccessListener { location: Location? ->
@@ -159,7 +149,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                     SkyImage.setDate()
                 }
             fusedLocationClient.lastLocation
-            clock.schedule(GetLastLocation(), WEATHER_INTERVAL)
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -400,9 +389,11 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // The user has completed the tap gesture.
                     // TODO: Add code to handle the tap gesture.
                 {
-                    var message: String = SkyImage.getWeather()?.name ?: "Could not get location"
-                    Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT)
-                        .show()
+                    var message: String = SkyImage.getWeather()?.let {
+                        "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
+                    } ?: "Could not get location"
+                        Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT)
+                            .show()
 
                 }
             }
@@ -520,6 +511,11 @@ class MyWatchFace : CanvasWatchFaceService() {
                 /* Update time zone in case it changed while we weren't visible. */
                 mCalendar.timeZone = TimeZone.getDefault()
                 invalidate()
+                if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
+                    fusedLocationClient.lastLocation
+                }
+                initializeBackground()
+                initGrayBackgroundBitmap()
             } else {
                 unregisterReceiver()
             }
@@ -530,8 +526,6 @@ class MyWatchFace : CanvasWatchFaceService() {
             /**
              * Ensure sky imagery is current when visibility of the watch face updates.
              */
-            initializeBackground()
-            initGrayBackgroundBitmap()
         }
 
         private fun registerReceiver() {

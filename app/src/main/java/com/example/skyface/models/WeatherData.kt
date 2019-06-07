@@ -19,7 +19,7 @@ data class WeatherData(
     @SerializedName("snow") val snow: Snow,
     @SerializedName("rain") val rain: Rain,
     @SerializedName("clouds") val clouds: Clouds,
-    @SerializedName("dt") val dt: Int,
+    @SerializedName("dt") val dt: Long,
     @SerializedName("sys") val sys: Sys,
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
