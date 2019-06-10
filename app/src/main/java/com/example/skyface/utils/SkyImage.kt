@@ -14,8 +14,6 @@ import kotlin.math.round
 import kotlin.math.roundToInt
 
 
-
-
 class Sky(context: Context){
     private val gson = Gson()
     private var myLocation: Location? = null

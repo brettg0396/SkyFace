@@ -1,9 +1,11 @@
 package com.example.skyface
 
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -23,6 +25,7 @@ import android.widget.Toast
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import android.location.Location
+import android.support.v4.app.ActivityCompat
 import com.example.skyface.utils.Sky
 import java.lang.ref.WeakReference
 import java.util.Calendar
@@ -61,6 +64,39 @@ private const val WEATHER_INTERVAL: Long = 1000*60*20 // 20 minutes (in ms)
  * in the Google Watch Face Code Lab:
  * https://codelabs.developers.google.com/codelabs/watchface/index.html#0
  */
+
+
+class PermissionRequestActivity : Activity() {
+    internal lateinit var mPermissions: Array<String?>
+    internal var mRequestCode: Int = 0
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        if (requestCode == mRequestCode) {
+            for (i in permissions.indices) {
+                val permission = permissions[i]
+                val grantResult = grantResults[i]
+                if (grantResult == PackageManager.PERMISSION_GRANTED){
+                    ActivityCompat.requestPermissions(this, arrayOf(permission),requestCode)
+                }
+            }
+        }
+        finish()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        mPermissions = arrayOfNulls(1)
+        mPermissions[0] = this.intent.getStringExtra("KEY_PERMISSIONS")
+        mRequestCode = this.intent.getIntExtra("KEY_REQUEST_CODE", PERMISSIONS_CODE)
+
+        ActivityCompat.requestPermissions(this, mPermissions, mRequestCode)
+    }
+
+    companion object {
+        private val PERMISSIONS_CODE = 0
+    }
+}
+
 class MyWatchFace : CanvasWatchFaceService() {
 
 
@@ -131,6 +167,10 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             super.onCreate(holder)
 
+            requestPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+            requestPermission(android.Manifest.permission.BODY_SENSORS)
+
+
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
             getLastLocation()
 
@@ -144,6 +184,13 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             initializeBackground()
             initializeWatchFace()
+        }
+
+        private fun requestPermission(permission: String){
+            val myIntent = Intent(baseContext, PermissionRequestActivity::class.java)
+            myIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            myIntent.putExtra("KEY_PERMISSIONS", permission)
+            startActivity(myIntent)
         }
 
         private fun getLastLocation()
