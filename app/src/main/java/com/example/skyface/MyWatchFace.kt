@@ -466,7 +466,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // TODO: Add code to handle the tap gesture.
                 {
                     getLastLocation()
-                    SkyImage.testWeather()
                     var message: String = SkyImage.getWeather()?.let {
                         "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
                     } ?: "Could not get location"
