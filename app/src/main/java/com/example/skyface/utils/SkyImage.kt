@@ -248,13 +248,15 @@ class Sky(context: Context){
         private val rate: Float
         private val maxWidth: Int
         private val maxHeight: Int
+        private var lastUpdate: Long
 
         init{
             srcImage = image
             direction = moveDirection
-            rate = moveRate
+            rate = moveRate/1000
             maxWidth = maxw
             maxHeight = maxh
+            lastUpdate = Calendar.getInstance().timeInMillis
         }
 
         operator fun plus(effect: Effect): Bitmap{
@@ -277,39 +279,51 @@ class Sky(context: Context){
         }
 
         fun getframe(): Bitmap{
-            var frame: Bitmap = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),maxWidth, maxHeight)
+            var frame: Bitmap
+            val time = Calendar.getInstance().timeInMillis
+            when(direction){
+                0 -> x = (x+(time-lastUpdate)*rate)%srcImage.width
+                1 -> y = (y+(time-lastUpdate)*rate)%srcImage.height
+                2 -> x = (x-(time-lastUpdate)*rate)%srcImage.width
+                3 -> y = (y-(time-lastUpdate)*rate)%srcImage.height
+                else -> x = (x+(time-lastUpdate)*rate)%srcImage.width
+            }
+            lastUpdate = time
+
+            val x_int = x.roundToInt()%srcImage.width
+            val y_int = y.roundToInt()%srcImage.height
+
             when(direction%2){
                 0 -> {
-                    if (srcImage.width - x.roundToInt() < maxWidth)
+                    if (srcImage.width - x_int in 1 until maxWidth)
                     {
-                        val frame1 = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),srcImage.width - x.roundToInt(), maxHeight)
-                        val frame2 = Bitmap.createBitmap(srcImage, 0, y.roundToInt(),maxWidth - (srcImage.width-x.roundToInt()), maxHeight)
+                        val frame1 = Bitmap.createBitmap(srcImage, x_int, y_int,srcImage.width - x_int, maxHeight)
+                        val frame2 = Bitmap.createBitmap(srcImage, 0, y_int,maxWidth - (srcImage.width-x_int), maxHeight)
                         val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
                         var canvas = Canvas(result)
                         canvas.drawBitmap(frame1,0f,0f,null)
-                        canvas.drawBitmap(frame2,round(x),0f,null)
+                        canvas.drawBitmap(frame2,(srcImage.width - x_int).toFloat(),0f,null)
                         frame = result
+                    }
+                    else{
+                        frame = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, maxHeight)
                     }
                 }
                 else -> {
-                    if (srcImage.height - y.roundToInt() < maxHeight)
+                    if (srcImage.height - y_int in 1 until maxHeight)
                     {
-                        val frame1 = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),maxWidth, srcImage.height - y.roundToInt())
-                        val frame2 = Bitmap.createBitmap(srcImage, x.roundToInt(), 0,maxWidth,maxHeight - (srcImage.height - y.roundToInt()))
+                        val frame1 = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, srcImage.height - y_int)
+                        val frame2 = Bitmap.createBitmap(srcImage, x_int, 0,maxWidth,maxHeight - (srcImage.height - y_int))
                         val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
                         var canvas = Canvas(result)
                         canvas.drawBitmap(frame1,0f,0f,null)
-                        canvas.drawBitmap(frame2,0f,round(y),null)
+                        canvas.drawBitmap(frame2,0f,(srcImage.height - y_int).toFloat(),null)
                         frame = result
                     }
+                    else{
+                        frame = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, maxHeight)
+                    }
                 }
-            }
-            when(direction){
-                0 -> x = (x+rate)%maxWidth
-                1 -> y = (y+rate)%maxHeight
-                2 -> x = (x-rate)%maxWidth
-                3 -> y = (y-rate)%maxHeight
-                else -> x = (x+rate)%maxWidth
             }
 
             return frame

@@ -36,7 +36,7 @@ import java.util.TimeZone
  * Updates rate in milliseconds for interactive mode. We update once a second to advance the
  * second hand.
  */
-private const val INTERACTIVE_UPDATE_RATE_MS = 1000
+private const val INTERACTIVE_UPDATE_RATE_MS = 1
 
 /**
  * Handler message id for updating the time periodically in interactive mode.
@@ -466,6 +466,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // TODO: Add code to handle the tap gesture.
                 {
                     getLastLocation()
+                    SkyImage.testWeather()
                     var message: String = SkyImage.getWeather()?.let {
                         "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
                     } ?: "Could not get location"
@@ -531,7 +532,7 @@ class MyWatchFace : CanvasWatchFaceService() {
              * 360 / 60 = 6 and 360 / 12 = 30.
              */
             val seconds =
-                mCalendar.get(Calendar.SECOND) + mCalendar.get(Calendar.MILLISECOND) / 1000f
+                mCalendar.get(Calendar.SECOND)// + mCalendar.get(Calendar.MILLISECOND) / 1000f
             val secondsRotation = seconds * 6f
 
             val minutesRotation = mCalendar.get(Calendar.MINUTE) * 6f
