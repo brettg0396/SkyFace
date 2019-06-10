@@ -26,6 +26,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import android.location.Location
 import android.support.v4.app.ActivityCompat
+import android.support.v4.content.ContextCompat
 import com.example.skyface.utils.Sky
 import java.lang.ref.WeakReference
 import java.util.Calendar
@@ -121,6 +122,8 @@ class MyWatchFace : CanvasWatchFaceService() {
 
         private var SkyImage: Sky = Sky(applicationContext)
 
+        private lateinit var myReceiver: BroadcastReceiver
+
         private lateinit var fusedLocationClient: FusedLocationProviderClient
 
         private lateinit var mCalendar: Calendar
@@ -163,12 +166,24 @@ class MyWatchFace : CanvasWatchFaceService() {
             }
         }
 
+        private val screenReceiver = object : BroadcastReceiver() {
+            override fun onReceive(contxt: Context?, intent: Intent?) {
+
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_ON -> onWake()
+
+                    Intent.ACTION_SCREEN_OFF -> onSleep()
+                }
+            }
+        }
+
         override fun onCreate(holder: SurfaceHolder) {
 
             super.onCreate(holder)
 
-            requestPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-            requestPermission(android.Manifest.permission.BODY_SENSORS)
+            this@MyWatchFace.registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+
+            requestPermission(arrayOf(android.Manifest.permission.BODY_SENSORS,android.Manifest.permission.ACCESS_COARSE_LOCATION))
 
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
@@ -186,26 +201,41 @@ class MyWatchFace : CanvasWatchFaceService() {
             initializeWatchFace()
         }
 
-        private fun requestPermission(permission: String){
+        private fun onWake(){
+            if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
+                getLastLocation()
+                initializeBackground()
+                initGrayBackgroundBitmap()
+            }
+        }
+
+        private fun onSleep()
+        {
+
+        }
+
+        private fun requestPermission(permissions: Array<String>){
             val myIntent = Intent(baseContext, PermissionRequestActivity::class.java)
             myIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            myIntent.putExtra("KEY_PERMISSIONS", permission)
+            myIntent.putExtra("KEY_PERMISSIONS", permissions)
             startActivity(myIntent)
         }
 
         private fun getLastLocation()
         {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location: Location? ->
-                    if(location!=null) {
-                        //Write your implemenation here
-                        myLocation = location
-                        SkyImage.setLocation(location)
-                        SkyImage.setWeather()
-                        SkyImage.setForecast()
+            if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                fusedLocationClient.lastLocation
+                    .addOnSuccessListener { location: Location? ->
+                        if (location != null) {
+                            //Write your implemenation here
+                            myLocation = location
+                            SkyImage.setLocation(location)
+                            SkyImage.setWeather()
+                            SkyImage.setForecast()
+                        }
+                        SkyImage.setDate()
                     }
-                    SkyImage.setDate()
-                }
+            }
         }
 
         private fun initializeBackground() {
@@ -274,6 +304,7 @@ class MyWatchFace : CanvasWatchFaceService() {
         }
 
         override fun onDestroy() {
+            this@MyWatchFace.unregisterReceiver(screenReceiver)
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME)
             super.onDestroy()
         }
@@ -565,13 +596,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                 registerReceiver()
                 /* Update time zone in case it changed while we weren't visible. */
                 mCalendar.timeZone = TimeZone.getDefault()
-                /**
-                 * Ensure sky imagery and weather are current when visibility of the watch face updates.
-                 */
                 invalidate()
-                if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
-                    getLastLocation()
-                }
                 initializeBackground()
                 initGrayBackgroundBitmap()
             } else {
