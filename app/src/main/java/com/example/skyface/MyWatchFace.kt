@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
@@ -15,7 +14,6 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
-import android.content.pm.PackageManager
 import android.support.v7.graphics.Palette
 import android.support.wearable.watchface.CanvasWatchFaceService
 import android.support.wearable.watchface.WatchFaceService
@@ -408,6 +406,7 @@ class MyWatchFace : CanvasWatchFaceService() {
             mCalendar.timeInMillis = now
 
             drawBackground(canvas)
+            drawEffects(canvas)
             drawWatchFace(canvas)
         }
 
@@ -419,6 +418,13 @@ class MyWatchFace : CanvasWatchFaceService() {
                 canvas.drawBitmap(mGrayBackgroundBitmap, 0f, 0f, mBackgroundPaint)
             } else {
                 canvas.drawBitmap(mBackgroundBitmap, 0f, 0f, mBackgroundPaint)
+            }
+        }
+
+        private fun drawEffects(canvas: Canvas) {
+            val effects = SkyImage.getEffects()
+            effects?.let{
+                canvas.drawBitmap(it,0f,0f,SkyImage.getEffectPaint())
             }
         }
 

@@ -1,7 +1,5 @@
 package com.example.skyface.utils
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import java.net.URL
 import com.google.gson.Gson
 import android.location.Location
@@ -9,9 +7,10 @@ import com.example.skyface.models.WeatherData
 import com.example.skyface.models.ForecastData
 import org.jetbrains.anko.doAsync
 import android.content.Context
-import android.graphics.Canvas
+import android.graphics.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.round
 import kotlin.math.roundToInt
 
 
@@ -22,8 +21,11 @@ class Sky(context: Context){
     private var myLocation: Location? = null
     private var Forecast: ForecastData? = null
     private var Weather: WeatherData? = null
+    private var weatherCode = 800
     private val myContext: Context
     private lateinit var skyImage: Bitmap
+    private var effects: List<Effect> = emptyList()
+    private var effectPaint: Int? = null
     private var tz = TimeZone.getDefault()
     private var date: Calendar
     private lateinit var solar: Solar
@@ -65,8 +67,8 @@ class Sky(context: Context){
          */
 
         val starImg: Bitmap = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stars)
-        var weatherCode = 800
         var seasonImg: Bitmap
+        var recolorImg: Bitmap
 
 
         Weather?.let {
@@ -74,20 +76,47 @@ class Sky(context: Context){
                 if (it.sys.sunrise*1000 != solar.dawn.set || it.sys.sunset*1000 != solar.dusk.set) {
                     updateSolar(it.sys.sunrise*1000, it.sys.sunset*1000, date.clone() as Calendar)
                 }
-                weatherCode = it.weather[0].id
+                if (weatherCode != it.weather[0].id) {
+                    weatherCode = it.weather[0].id
+                    setEffects(starImg.width,starImg.height)
+                }
             }
         }
 
-        seasonImg = when(weatherCode) {
-            in 200..232, in 502..511, in 602..611,804 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_stormy)
-            in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 803 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_overcast)
+        when(weatherCode) {
+            in 200..232, in 502..511, in 602..611 -> {
+                seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_stormy)
+                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_stormy)
+            }
+            in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 804 -> {
+                seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_overcast)
+                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_overcast)
+            }
             else -> when (date.get(Calendar.MONTH)) {
-                in 0..1 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
-                in 2..4 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
-                in 5..7 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_summer)
-                in 8..10 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_fall)
-                11 -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
-                else -> BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
+                in 0..1 -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
+                }
+                in 2..4 -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_spring)
+                }
+                in 5..7 -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_summer)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_summer)
+                }
+                in 8..10 -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_fall)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_fall)
+                }
+                11 -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_winter)
+                }
+                else -> {
+                    seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_spring)
+                }
             }
         }
         /**
@@ -111,12 +140,13 @@ class Sky(context: Context){
         }
 
         seasonImg = Bitmap.createBitmap(seasonImg, 0, time,skyWidth, skyWidth)
-        val result: Bitmap = Bitmap.createBitmap(starImg.width, starImg.height, starImg.config);
-        val canvas = Canvas(result);
-        canvas.drawBitmap(starImg, 0f, 0f, null);
-        canvas.drawBitmap(seasonImg, 0f, 0f, null);
+        val result = Bitmap.createBitmap(starImg.width, starImg.height, starImg.config)
+        val canvas = Canvas(result)
+        canvas.drawBitmap(starImg, 0f, 0f, null)
+        canvas.drawBitmap(seasonImg, 0f, 0f, null)
         skyImage = result
-        return result;
+        effectPaint = recolorImg.getPixel(0,time)
+        return result
     }
 
     fun printTime(time: Long): String{
@@ -145,6 +175,147 @@ class Sky(context: Context){
         }
         return time
 
+    }
+
+    private fun setEffects(maxWidth: Int, maxHeight: Int) {
+        val windSpeed: Float = Weather?.wind?.speed ?: 3f
+        effects = when (weatherCode) {
+            in 200..232, in 502..511, in 602..611 -> listOf(
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy3), 0, windSpeed*1/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy2), 0, windSpeed*2/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy1), 0, windSpeed,maxWidth,maxHeight )
+                )
+            in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 804 -> listOf(
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast3), 0, windSpeed*1/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast2), 0, windSpeed*2/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast1), 0, windSpeed,maxWidth,maxHeight )
+            )
+            801 -> listOf(
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds1), 0, windSpeed,maxWidth,maxHeight )
+            )
+            802 -> listOf(
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds2), 0, windSpeed*1/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds1), 0, windSpeed*2/3,maxWidth,maxHeight )
+            )
+            803 -> listOf(
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds3), 0, windSpeed*1/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds2), 0, windSpeed*2/3,maxWidth,maxHeight ),
+                Effect(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds1), 0, windSpeed,maxWidth,maxHeight )
+            )
+            else -> emptyList()
+        }
+    }
+
+    fun getEffects(): Bitmap?{
+        var frame: Bitmap?
+        if (effects.size >= 2){
+            frame = addEffects(0,1,effects.size)
+        }
+        else{
+            if (effects.isNotEmpty()){
+                frame = effects[0].getframe()
+            }
+            else{
+                frame = null
+            }
+        }
+
+        return frame
+    }
+
+    fun getEffectPaint(): Paint? {
+        val color = Paint()
+        effectPaint?.let{
+            color.colorFilter=PorterDuffColorFilter(it,PorterDuff.Mode.SRC_IN)
+        }
+        return color
+    }
+
+    private fun addEffects(effect1: Int, effect2: Int, max: Int): Bitmap{
+        val frame: Bitmap
+        if (effect2+1 < max){
+            frame = addEffects(effect1+1,effect2+1,max)
+        }
+        else{
+            frame = effects[effect2].getframe()
+        }
+        return effects[effect1]+frame
+    }
+
+    inner class Effect(image: Bitmap, moveDirection: Int, moveRate: Float, maxw: Int, maxh: Int){
+        private var x: Float = 0f
+        private var y: Float = 0f
+        private val srcImage: Bitmap
+        private val direction: Int
+        private val rate: Float
+        private val maxWidth: Int
+        private val maxHeight: Int
+
+        init{
+            srcImage = image
+            direction = moveDirection
+            rate = moveRate
+            maxWidth = maxw
+            maxHeight = maxh
+        }
+
+        operator fun plus(effect: Effect): Bitmap{
+            val frame1 = getframe()
+            val frame2 = effect.getframe()
+            val result = Bitmap.createBitmap(frame2.width, frame2.height, frame2.config)
+            val canvas = Canvas(result)
+            canvas.drawBitmap(frame2, 0f, 0f, null)
+            canvas.drawBitmap(frame1, 0f, 0f, null)
+            return result
+        }
+
+        operator fun plus(bitmap: Bitmap): Bitmap{
+            val frame1 = getframe()
+            val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
+            val canvas = Canvas(result)
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+            canvas.drawBitmap(frame1, 0f, 0f, null)
+            return result
+        }
+
+        fun getframe(): Bitmap{
+            var frame: Bitmap = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),maxWidth, maxHeight)
+            when(direction%2){
+                0 -> {
+                    if (srcImage.width - x.roundToInt() < maxWidth)
+                    {
+                        val frame1 = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),srcImage.width - x.roundToInt(), maxHeight)
+                        val frame2 = Bitmap.createBitmap(srcImage, 0, y.roundToInt(),maxWidth - (srcImage.width-x.roundToInt()), maxHeight)
+                        val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
+                        var canvas = Canvas(result)
+                        canvas.drawBitmap(frame1,0f,0f,null)
+                        canvas.drawBitmap(frame2,round(x),0f,null)
+                        frame = result
+                    }
+                }
+                else -> {
+                    if (srcImage.height - y.roundToInt() < maxHeight)
+                    {
+                        val frame1 = Bitmap.createBitmap(srcImage, x.roundToInt(), y.roundToInt(),maxWidth, srcImage.height - y.roundToInt())
+                        val frame2 = Bitmap.createBitmap(srcImage, x.roundToInt(), 0,maxWidth,maxHeight - (srcImage.height - y.roundToInt()))
+                        val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
+                        var canvas = Canvas(result)
+                        canvas.drawBitmap(frame1,0f,0f,null)
+                        canvas.drawBitmap(frame2,0f,round(y),null)
+                        frame = result
+                    }
+                }
+            }
+            when(direction){
+                0 -> x = (x+rate)%maxWidth
+                1 -> y = (y+rate)%maxHeight
+                2 -> x = (x-rate)%maxWidth
+                3 -> y = (y-rate)%maxHeight
+                else -> x = (x+rate)%maxWidth
+            }
+
+            return frame
+        }
     }
 
     private fun updateSolar(sunrise: Long, sunset: Long, today: Calendar){
