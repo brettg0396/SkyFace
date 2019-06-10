@@ -415,9 +415,9 @@ class Sky(context: Context){
         return myLocation
     }
 
-    fun testWeather(){
+    fun testWeather(latitude: Double, longitude: Double){
         doAsync {
-            val weather_url: String = URL_Builder.getWeather(28.04, -81.95)
+            val weather_url: String = URL_Builder.getWeather(latitude, longitude)
             Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
         }
     }

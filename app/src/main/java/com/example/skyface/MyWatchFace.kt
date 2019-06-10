@@ -28,6 +28,7 @@ import android.location.Location
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import com.example.skyface.utils.Sky
+import org.jetbrains.anko.locationManager
 import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.TimeZone
@@ -226,7 +227,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                 fusedLocationClient.lastLocation
                     .addOnSuccessListener { location: Location? ->
                         if (location != null) {
-                            //Write your implemenation here
                             myLocation = location
                             SkyImage.setLocation(location)
                             SkyImage.setWeather()
@@ -501,7 +501,13 @@ class MyWatchFace : CanvasWatchFaceService() {
         private fun drawEffects(canvas: Canvas) {
             val effects = SkyImage.getEffects()
             effects?.let{
-                canvas.drawBitmap(it,0f,0f,SkyImage.getEffectPaint())
+                if (mAmbient && (mLowBitAmbient || mBurnInProtection)) {
+                    canvas.drawColor(Color.BLACK)
+                } else if (mAmbient) {
+                    canvas.drawBitmap(it, 0f, 0f, mBackgroundPaint)
+                } else {
+                    canvas.drawBitmap(it,0f,0f,SkyImage.getEffectPaint())
+                }
             }
         }
 
