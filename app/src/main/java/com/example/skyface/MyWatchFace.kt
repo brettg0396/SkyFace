@@ -222,7 +222,7 @@ class MyWatchFace : CanvasWatchFaceService() {
 
         private fun getLastLocation()
         {
-            if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 fusedLocationClient.lastLocation
                     .addOnSuccessListener { location: Location? ->
                         if (location != null) {
