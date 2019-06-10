@@ -86,8 +86,7 @@ class PermissionRequestActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        mPermissions = arrayOfNulls(1)
-        mPermissions[0] = this.intent.getStringExtra("KEY_PERMISSIONS")
+        mPermissions = this.intent.getStringArrayExtra("KEY_PERMISSIONS")
         mRequestCode = this.intent.getIntExtra("KEY_REQUEST_CODE", PERMISSIONS_CODE)
 
         ActivityCompat.requestPermissions(this, mPermissions, mRequestCode)
@@ -204,9 +203,9 @@ class MyWatchFace : CanvasWatchFaceService() {
         private fun onWake(){
             if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
                 getLastLocation()
-                initializeBackground()
-                initGrayBackgroundBitmap()
             }
+            initializeBackground()
+            initGrayBackgroundBitmap()
         }
 
         private fun onSleep()
