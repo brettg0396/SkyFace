@@ -199,7 +199,7 @@ class MyWatchFace : CanvasWatchFaceService() {
         }
 
         private fun onWake(){
-            if (Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL){
+            if ((Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL) || SkyImage.getLocation() == null){
                 getLastLocation()
             }
             initializeBackground()
