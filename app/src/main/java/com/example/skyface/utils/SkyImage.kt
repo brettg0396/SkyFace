@@ -10,8 +10,10 @@ import android.content.Context
 import android.graphics.*
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.round
 import kotlin.math.roundToInt
+import android.graphics.PorterDuffXfermode
+
+
 
 
 class Sky(context: Context){
@@ -23,7 +25,7 @@ class Sky(context: Context){
     private val myContext: Context
     private lateinit var skyImage: Bitmap
     private var effects: List<Effect> = emptyList()
-    private var effectPaint: Int? = null
+    private var effectPaint: Bitmap? = null
     private var tz = TimeZone.getDefault()
     private var date: Calendar
     private lateinit var solar: Solar
@@ -66,7 +68,7 @@ class Sky(context: Context){
 
         val starImg: Bitmap = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stars)
         var seasonImg: Bitmap
-        var recolorImg: Bitmap
+        val recolorImg: Bitmap
 
 
         Weather?.let {
@@ -79,6 +81,8 @@ class Sky(context: Context){
                     setEffects(starImg.width,starImg.height)
                 }
             }
+
+            setEffects(starImg.width,starImg.height)
         }
 
         when(weatherCode) {
@@ -143,12 +147,12 @@ class Sky(context: Context){
         canvas.drawBitmap(starImg, 0f, 0f, null)
         canvas.drawBitmap(seasonImg, 0f, 0f, null)
         skyImage = result
-        effectPaint = recolorImg.getPixel(0,time)
+        effectPaint = Bitmap.createBitmap(recolorImg,0,time,skyWidth,skyWidth)
         return result
     }
 
     fun printTime(time: Long): String{
-        var cal: Calendar = Calendar.getInstance()
+        val cal: Calendar = Calendar.getInstance()
         cal.timeInMillis = time
         return SimpleDateFormat("yyyy-MM-dd HH:mm:ss",Locale.getDefault()).format(cal.time)
     }
@@ -159,14 +163,14 @@ class Sky(context: Context){
         val diff: Float = (currentTime - start).toFloat() //get current time in comparison to total
         val rate: Float = max.toFloat()/totalDiff //divide number of pixels to travel over total time in shift
         val progress: Int = (rate*diff).roundToInt() //multiply current time by rate to get current pixel height of shift
-        if (reversed){
-            time = when{
+        time = if (reversed){
+            when{
                 min+progress > max -> max
                 else -> min+progress
             }
         }
         else {
-            time = when{
+            when{
                 max-progress < min -> min
                 else -> max-progress
             }
@@ -205,13 +209,13 @@ class Sky(context: Context){
     }
 
     fun getEffects(): Bitmap?{
-        var frame: Bitmap?
+        val frame: Bitmap?
         if (effects.size >= 2){
             frame = addEffects(0,1,effects.size)
         }
         else{
             if (effects.isNotEmpty()){
-                frame = effects[0].getframe()
+                frame = effects[0].getFrame()
             }
             else{
                 frame = null
@@ -221,21 +225,27 @@ class Sky(context: Context){
         return frame
     }
 
+    fun getShader(): Bitmap {
+        effectPaint?.let{
+            return it
+        }
+        return Bitmap.createBitmap(0,0,Bitmap.Config.ARGB_8888)
+    }
+
     fun getEffectPaint(): Paint? {
         val color = Paint()
         effectPaint?.let{
-            color.colorFilter=PorterDuffColorFilter(it,PorterDuff.Mode.SRC_IN)
+            color.xfermode=PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
         }
         return color
     }
 
     private fun addEffects(effect1: Int, effect2: Int, max: Int): Bitmap{
-        val frame: Bitmap
-        if (effect2+1 < max){
-            frame = addEffects(effect1+1,effect2+1,max)
+        val frame = if (effect2+1 < max){
+            addEffects(effect1+1,effect2+1,max)
         }
         else{
-            frame = effects[effect2].getframe()
+            effects[effect2].getFrame()
         }
         return effects[effect1]+frame
     }
@@ -260,8 +270,8 @@ class Sky(context: Context){
         }
 
         operator fun plus(effect: Effect): Bitmap{
-            val frame1 = getframe()
-            val frame2 = effect.getframe()
+            val frame1 = getFrame()
+            val frame2 = effect.getFrame()
             val result = Bitmap.createBitmap(frame2.width, frame2.height, frame2.config)
             val canvas = Canvas(result)
             canvas.drawBitmap(frame2, 0f, 0f, null)
@@ -270,7 +280,7 @@ class Sky(context: Context){
         }
 
         operator fun plus(bitmap: Bitmap): Bitmap{
-            val frame1 = getframe()
+            val frame1 = getFrame()
             val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
             val canvas = Canvas(result)
             canvas.drawBitmap(bitmap, 0f, 0f, null)
@@ -278,8 +288,8 @@ class Sky(context: Context){
             return result
         }
 
-        fun getframe(): Bitmap{
-            var frame: Bitmap
+        fun getFrame(): Bitmap{
+            val frame: Bitmap
             val time = Calendar.getInstance().timeInMillis
             when(direction){
                 0 -> x = (x+(time-lastUpdate)*rate)%srcImage.width
@@ -290,38 +300,38 @@ class Sky(context: Context){
             }
             lastUpdate = time
 
-            val x_int = x.roundToInt()%srcImage.width
-            val y_int = y.roundToInt()%srcImage.height
+            val xInt = x.roundToInt()%srcImage.width
+            val yInt = y.roundToInt()%srcImage.height
 
             when(direction%2){
                 0 -> {
-                    if (srcImage.width - x_int in 1 until maxWidth)
+                    if (srcImage.width - xInt in 1 until maxWidth)
                     {
-                        val frame1 = Bitmap.createBitmap(srcImage, x_int, y_int,srcImage.width - x_int, maxHeight)
-                        val frame2 = Bitmap.createBitmap(srcImage, 0, y_int,maxWidth - (srcImage.width-x_int), maxHeight)
+                        val frame1 = Bitmap.createBitmap(srcImage, xInt, yInt,srcImage.width - xInt, maxHeight)
+                        val frame2 = Bitmap.createBitmap(srcImage, 0, yInt,maxWidth - (srcImage.width-xInt), maxHeight)
                         val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
-                        var canvas = Canvas(result)
+                        val canvas = Canvas(result)
                         canvas.drawBitmap(frame1,0f,0f,null)
-                        canvas.drawBitmap(frame2,(srcImage.width - x_int).toFloat(),0f,null)
+                        canvas.drawBitmap(frame2,(srcImage.width - xInt).toFloat(),0f,null)
                         frame = result
                     }
                     else{
-                        frame = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, maxHeight)
+                        frame = Bitmap.createBitmap(srcImage, xInt, yInt,maxWidth, maxHeight)
                     }
                 }
                 else -> {
-                    if (srcImage.height - y_int in 1 until maxHeight)
+                    frame = if (srcImage.height - yInt in 1 until maxHeight)
                     {
-                        val frame1 = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, srcImage.height - y_int)
-                        val frame2 = Bitmap.createBitmap(srcImage, x_int, 0,maxWidth,maxHeight - (srcImage.height - y_int))
+                        val frame1 = Bitmap.createBitmap(srcImage, xInt, yInt,maxWidth, srcImage.height - yInt)
+                        val frame2 = Bitmap.createBitmap(srcImage, xInt, 0,maxWidth,maxHeight - (srcImage.height - yInt))
                         val result = Bitmap.createBitmap(maxWidth,maxHeight,srcImage.config)
-                        var canvas = Canvas(result)
+                        val canvas = Canvas(result)
                         canvas.drawBitmap(frame1,0f,0f,null)
-                        canvas.drawBitmap(frame2,0f,(srcImage.height - y_int).toFloat(),null)
-                        frame = result
+                        canvas.drawBitmap(frame2,0f,(srcImage.height - yInt).toFloat(),null)
+                        result
                     }
                     else{
-                        frame = Bitmap.createBitmap(srcImage, x_int, y_int,maxWidth, maxHeight)
+                        Bitmap.createBitmap(srcImage, xInt, yInt,maxWidth, maxHeight)
                     }
                 }
             }
@@ -352,7 +362,7 @@ class Sky(context: Context){
         duskDate.set(Calendar.MINUTE,0)
         duskDate.set(Calendar.SECOND,0)
         val todayCal: Calendar = duskDate.clone() as Calendar
-        duskDate.add(Calendar.MILLISECOND,getDST_OFFSET())
+        duskDate.add(Calendar.MILLISECOND,getDSTOFFSET())
         val dawnDate: Calendar = duskDate.clone() as Calendar
         duskDate.add(Calendar.HOUR_OF_DAY,19)
         dawnDate.add(Calendar.HOUR_OF_DAY,7)
@@ -369,7 +379,7 @@ class Sky(context: Context){
         solar = Solar(month_day,dawn,dusk,today,tomorrow)
     }
 
-    private fun getDST_OFFSET(): Int{
+    private fun getDSTOFFSET(): Int{
         val tempCal: Calendar = Calendar.getInstance(tz)
         return when(tz.inDaylightTime(tempCal.time)){
             true -> tempCal.get(Calendar.DST_OFFSET)

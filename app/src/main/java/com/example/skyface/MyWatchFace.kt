@@ -28,7 +28,6 @@ import android.location.Location
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import com.example.skyface.utils.Sky
-import org.jetbrains.anko.locationManager
 import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.TimeZone
@@ -105,8 +104,8 @@ class MyWatchFace : CanvasWatchFaceService() {
         return Engine()
     }
 
-    private class EngineHandler(reference: MyWatchFace.Engine) : Handler() {
-        private val mWeakReference: WeakReference<MyWatchFace.Engine> = WeakReference(reference)
+    private class EngineHandler(reference: Engine) : Handler() {
+        private val mWeakReference: WeakReference<Engine> = WeakReference(reference)
 
         override fun handleMessage(msg: Message) {
             val engine = mWeakReference.get()
@@ -121,8 +120,6 @@ class MyWatchFace : CanvasWatchFaceService() {
     inner class Engine : CanvasWatchFaceService.Engine() {
 
         private var SkyImage: Sky = Sky(applicationContext)
-
-        private lateinit var myReceiver: BroadcastReceiver
 
         private lateinit var fusedLocationClient: FusedLocationProviderClient
 
@@ -465,8 +462,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // The user has completed the tap gesture.
                     // TODO: Add code to handle the tap gesture.
                 {
-                    getLastLocation()
-                    var message: String = SkyImage.getWeather()?.let {
+                    val message: String = SkyImage.getWeather()?.let {
                         "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
                     } ?: "Could not get location"
                         Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT)
@@ -506,7 +502,11 @@ class MyWatchFace : CanvasWatchFaceService() {
                 } else if (mAmbient) {
                     canvas.drawBitmap(it, 0f, 0f, mBackgroundPaint)
                 } else {
-                    canvas.drawBitmap(it,0f,0f,SkyImage.getEffectPaint())
+                    val effect = Bitmap.createBitmap(it.width, it.height, it.config)
+                    val effectCanvas = Canvas(effect)
+                    effectCanvas.drawBitmap(it,0f,0f,Paint())
+                    effectCanvas.drawBitmap(SkyImage.getShader(),0f,0f,SkyImage.getEffectPaint())
+                    canvas.drawBitmap(effect,0f,0f,Paint())
                 }
             }
         }
