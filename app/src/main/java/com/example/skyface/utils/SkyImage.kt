@@ -81,8 +81,6 @@ class Sky(context: Context){
                     setEffects(starImg.width,starImg.height)
                 }
             }
-
-            setEffects(starImg.width,starImg.height)
         }
 
         when(weatherCode) {
@@ -267,6 +265,7 @@ class Sky(context: Context){
             maxWidth = maxw
             maxHeight = maxh
             lastUpdate = Calendar.getInstance().timeInMillis
+            println("Test")
         }
 
         operator fun plus(effect: Effect): Bitmap{
