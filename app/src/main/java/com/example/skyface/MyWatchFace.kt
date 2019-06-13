@@ -602,8 +602,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                 /* Update time zone in case it changed while we weren't visible. */
                 mCalendar.timeZone = TimeZone.getDefault()
                 invalidate()
-                initializeBackground()
-                initGrayBackgroundBitmap()
             } else {
                 unregisterReceiver()
             }
