@@ -265,7 +265,6 @@ class Sky(context: Context){
             maxWidth = maxw
             maxHeight = maxh
             lastUpdate = Calendar.getInstance().timeInMillis
-            println("Test")
         }
 
         operator fun plus(effect: Effect): Bitmap{
