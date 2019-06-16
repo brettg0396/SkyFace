@@ -6,13 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
-import android.graphics.Rect
+import android.graphics.*
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
@@ -28,9 +22,9 @@ import android.location.Location
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import com.example.skyface.utils.Sky
+import org.jetbrains.anko.doAsync
 import java.lang.ref.WeakReference
-import java.util.Calendar
-import java.util.TimeZone
+import java.util.*
 
 /**
  * Updates rate in milliseconds for interactive mode. We update once a second to advance the
@@ -51,6 +45,7 @@ private const val CENTER_GAP_AND_CIRCLE_RADIUS = 4f
 
 private const val SHADOW_RADIUS = 6f
 private const val WEATHER_INTERVAL: Long = 1000*60*20 // 20 minutes (in ms)
+private const val SCREEN_INTERVAL: Long = 1000*5 // 5 seconds
 
 /**
  * Analog watch face with a ticking second hand. In ambient mode, the second hand isn't
@@ -68,8 +63,8 @@ private const val WEATHER_INTERVAL: Long = 1000*60*20 // 20 minutes (in ms)
 
 
 class PermissionRequestActivity : Activity() {
-    internal lateinit var mPermissions: Array<String?>
-    internal var mRequestCode: Int = 0
+    private lateinit var mPermissions: Array<String?>
+    private var mRequestCode: Int = 0
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode == mRequestCode) {
@@ -120,6 +115,8 @@ class MyWatchFace : CanvasWatchFaceService() {
     inner class Engine : CanvasWatchFaceService.Engine() {
 
         private var SkyImage: Sky = Sky(applicationContext)
+        private var updateLock: Boolean = false
+        private var lastUpdate: Long = 0L
 
         private lateinit var fusedLocationClient: FusedLocationProviderClient
 
@@ -127,7 +124,7 @@ class MyWatchFace : CanvasWatchFaceService() {
         private var myLocation: Location? = null
 
         private var mRegisteredTimeZoneReceiver = false
-        private var mMuteMode: Boolean = false
+        private var mMuteMode = false
         private var mCenterX: Float = 0F
         private var mCenterY: Float = 0F
 
@@ -139,6 +136,9 @@ class MyWatchFace : CanvasWatchFaceService() {
         private var mWatchHandColor: Int = 0
         private var mWatchHandHighlightColor: Int = 0
         private var mWatchHandShadowColor: Int = 0
+        private var tempWatchHandColor: Int = mWatchHandColor
+        private var tempWatchHandHighlightColor: Int = mWatchHandHighlightColor
+        private var tempWatchHandShadowColor: Int  = mWatchHandShadowColor
 
         private lateinit var mHourPaint: Paint
         private lateinit var mMinutePaint: Paint
@@ -148,10 +148,15 @@ class MyWatchFace : CanvasWatchFaceService() {
         private lateinit var mBackgroundPaint: Paint
         private lateinit var mBackgroundBitmap: Bitmap
         private lateinit var mGrayBackgroundBitmap: Bitmap
+        private lateinit var tempBackgroundBitmap: Bitmap
+        private lateinit var tempGrayBackgroundBitmap: Bitmap
+        private var tempEffects: List<Sky.Effect>? = emptyList()
 
         private var mAmbient: Boolean = false
         private var mLowBitAmbient: Boolean = false
         private var mBurnInProtection: Boolean = false
+
+        private val clock: Timer = Timer()
 
         /* Handler to update the time once a second in interactive mode. */
         private val mUpdateTimeHandler = EngineHandler(this)
@@ -160,6 +165,20 @@ class MyWatchFace : CanvasWatchFaceService() {
             override fun onReceive(context: Context, intent: Intent) {
                 mCalendar.timeZone = TimeZone.getDefault()
                 invalidate()
+            }
+        }
+
+        inner class UpdateLocation: TimerTask(){
+            override fun run(){
+                getLastLocation()
+            }
+        }
+
+        inner class LightningFlash: TimerTask(){
+            override fun run(){
+                if ((Calendar.getInstance().timeInMillis < lastUpdate + 30000L) && SkyImage.hasEffect("lightning")) {
+                    SkyImage.flashLightning()
+                }
             }
         }
 
@@ -174,6 +193,18 @@ class MyWatchFace : CanvasWatchFaceService() {
             }
         }
 
+        private fun setTemps(){
+            tempBackgroundBitmap = mBackgroundBitmap
+            Palette.from(tempBackgroundBitmap).generate {
+                it?.let {
+                    tempWatchHandHighlightColor = it.getVibrantColor(Color.RED)
+                    tempWatchHandColor = it.getLightVibrantColor(Color.WHITE)
+                    tempWatchHandShadowColor = it.getDarkMutedColor(Color.BLACK)
+                }
+            }
+            tempGrayBackgroundBitmap = mGrayBackgroundBitmap
+        }
+
         override fun onCreate(holder: SurfaceHolder) {
 
             super.onCreate(holder)
@@ -184,7 +215,6 @@ class MyWatchFace : CanvasWatchFaceService() {
 
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
-            getLastLocation()
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -194,21 +224,53 @@ class MyWatchFace : CanvasWatchFaceService() {
 
             mCalendar = Calendar.getInstance()
 
-            initializeBackground()
+            clock.schedule(LightningFlash(),1000L,6000L)
+
+            clock.scheduleAtFixedRate(UpdateLocation(),0L,WEATHER_INTERVAL)
+
             initializeWatchFace()
+            updateLock=true
+            initializeBackground()
+            initGrayBackgroundBitmap()
+            updateLock=false
+            setTemps()
+        }
+
+        private fun updateBackground(priority: Boolean=false){
+            doAsync {
+                var doUpdate = false
+                if (priority){
+                    while (updateLock){
+
+                    }
+                    doUpdate = true
+                } else if (!updateLock && (Calendar.getInstance().timeInMillis >= lastUpdate+SCREEN_INTERVAL)) {
+                    doUpdate = true
+
+                }
+                if (doUpdate)
+                {
+                    updateLock = true
+                    initializeBackground()
+                    initGrayBackgroundBitmap()
+                    lastUpdate=Calendar.getInstance().timeInMillis
+                    updateLock = false
+                    setTemps()
+                }
+            }
         }
 
         private fun onWake(){
-            if ((Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL) || SkyImage.getLocation() == null){
+            if (timeZoneChanged()) {
+                SkyImage.updateTZ()
                 getLastLocation()
             }
-            initializeBackground()
-            initGrayBackgroundBitmap()
+
+            updateBackground()
         }
 
         private fun onSleep()
         {
-
         }
 
         private fun requestPermission(permissions: Array<String>){
@@ -485,28 +547,62 @@ class MyWatchFace : CanvasWatchFaceService() {
 
         private fun drawBackground(canvas: Canvas) {
 
+            val background: Bitmap
+            val gray: Bitmap
+            val paint = Paint(mBackgroundPaint)
+            if (!updateLock){
+                background = mBackgroundBitmap
+                gray = mGrayBackgroundBitmap
+            }
+            else {
+                background = tempBackgroundBitmap
+                gray = tempGrayBackgroundBitmap
+            }
             if (mAmbient && (mLowBitAmbient || mBurnInProtection)) {
                 canvas.drawColor(Color.BLACK)
             } else if (mAmbient) {
-                canvas.drawBitmap(mGrayBackgroundBitmap, 0f, 0f, mBackgroundPaint)
+                canvas.drawBitmap(gray, 0f, 0f, paint.apply{
+                    if (SkyImage.getLightning()) colorFilter = PorterDuffColorFilter(Color.WHITE,PorterDuff.Mode.SRC_IN)
+                })
             } else {
-                canvas.drawBitmap(mBackgroundBitmap, 0f, 0f, mBackgroundPaint)
+                canvas.drawBitmap(background, 0f, 0f, paint.apply{
+                    if (SkyImage.getLightning()) colorFilter = PorterDuffColorFilter(Color.WHITE,PorterDuff.Mode.SRC_IN)
+                })
             }
         }
 
         private fun drawEffects(canvas: Canvas) {
-            val effects = SkyImage.getEffects()
-            effects?.let{
+            val effects = if (!updateLock) SkyImage.getEffects()
+            else tempEffects
+
+            effects?.let {
+                tempEffects = it
                 if (mAmbient && (mLowBitAmbient || mBurnInProtection)) {
                     canvas.drawColor(Color.BLACK)
                 } else if (mAmbient) {
-                    canvas.drawBitmap(it, 0f, 0f, mBackgroundPaint)
+                    for (effect in effects) {
+                        val frame = effect.getFrame()
+                        val paint = Paint(mBackgroundPaint)
+                        canvas.drawBitmap(frame, 0f, 0f, paint.apply {
+                            if (SkyImage.getLightning()) colorFilter =
+                                PorterDuffColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN)
+                        })
+                    }
                 } else {
-                    val effect = Bitmap.createBitmap(it.width, it.height, it.config)
-                    val effectCanvas = Canvas(effect)
-                    effectCanvas.drawBitmap(it,0f,0f,Paint())
-                    effectCanvas.drawBitmap(SkyImage.getShader(),0f,0f,SkyImage.getEffectPaint())
-                    canvas.drawBitmap(effect,0f,0f,Paint())
+                    for (effect in effects) {
+                        val frame = effect.getFrame()
+                        val effectBitmap = Bitmap.createBitmap(frame.width, frame.height, frame.config)
+                        val effectCanvas = Canvas(effectBitmap)
+                        effectCanvas.drawBitmap(frame, 0f, 0f, Paint().apply {
+                            if (SkyImage.getLightning()) this.colorFilter =
+                                PorterDuffColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN)
+                        })
+                        effectCanvas.drawBitmap(effect.getShader(), 0f, 0f, effect.getPaint().apply {
+                                if (SkyImage.getLightning()) this?.colorFilter =
+                                    PorterDuffColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN)
+                            })
+                        canvas.drawBitmap(effectBitmap, 0f, 0f, Paint())
+                    }
                 }
             }
         }
@@ -518,6 +614,10 @@ class MyWatchFace : CanvasWatchFaceService() {
              * cases where you want to allow users to select their own photos, this dynamically
              * creates them on top of the photo.
              */
+            val mTickAndCirclePaintCopy = Paint(mTickAndCirclePaint)
+            val mHourPaintCopy = Paint(mHourPaint)
+            val mMinutePaintCopy = Paint(mMinutePaint)
+            val mSecondPaintCopy = Paint(mSecondPaint)
             val innerTickRadius = mCenterX - 10
             val outerTickRadius = mCenterX
             for (tickIndex in 0..11) {
@@ -528,7 +628,18 @@ class MyWatchFace : CanvasWatchFaceService() {
                 val outerY = (-Math.cos(tickRot.toDouble())).toFloat() * outerTickRadius
                 canvas.drawLine(
                     mCenterX + innerX, mCenterY + innerY,
-                    mCenterX + outerX, mCenterY + outerY, mTickAndCirclePaint
+                    mCenterX + outerX, mCenterY + outerY, mTickAndCirclePaintCopy.apply{
+                        if (SkyImage.getLightning()) {
+                            color = Color.BLACK
+                            setShadowLayer(
+                                SHADOW_RADIUS, 0f, 0f, Color.WHITE)
+                        }
+                        else if (updateLock){
+                            color = tempWatchHandColor
+                            setShadowLayer(
+                                SHADOW_RADIUS, 0f, 0f, tempWatchHandShadowColor)
+                        }
+                    }
                 )
             }
 
@@ -556,7 +667,18 @@ class MyWatchFace : CanvasWatchFaceService() {
                 mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
                 mCenterX,
                 mCenterY - sHourHandLength,
-                mHourPaint
+                mHourPaintCopy.apply{
+                    if (SkyImage.getLightning()) {
+                        color = Color.BLACK
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, Color.WHITE)
+                    }
+                    else if (updateLock){
+                        color = tempWatchHandColor
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, tempWatchHandShadowColor)
+                    }
+                }
             )
 
             canvas.rotate(minutesRotation - hoursRotation, mCenterX, mCenterY)
@@ -565,7 +687,18 @@ class MyWatchFace : CanvasWatchFaceService() {
                 mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
                 mCenterX,
                 mCenterY - sMinuteHandLength,
-                mMinutePaint
+                mMinutePaintCopy.apply{
+                    if (SkyImage.getLightning()) {
+                        color = Color.BLACK
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, Color.WHITE)
+                    }
+                    else if (updateLock){
+                        color = tempWatchHandColor
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, tempWatchHandShadowColor)
+                    }
+                }
             )
 
             /*
@@ -579,7 +712,18 @@ class MyWatchFace : CanvasWatchFaceService() {
                     mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
                     mCenterX,
                     mCenterY - mSecondHandLength,
-                    mSecondPaint
+                    mSecondPaintCopy.apply{
+                        if (SkyImage.getLightning()) {
+                            color = Color.CYAN
+                            setShadowLayer(
+                                SHADOW_RADIUS, 0f, 0f, Color.WHITE)
+                        }
+                        else if (updateLock){
+                            color = tempWatchHandHighlightColor
+                            setShadowLayer(
+                                SHADOW_RADIUS, 0f, 0f, tempWatchHandShadowColor)
+                        }
+                    }
                 )
 
             }
@@ -587,11 +731,31 @@ class MyWatchFace : CanvasWatchFaceService() {
                 mCenterX,
                 mCenterY,
                 CENTER_GAP_AND_CIRCLE_RADIUS,
-                mTickAndCirclePaint
+                mTickAndCirclePaintCopy.apply{
+                    if (SkyImage.getLightning()) {
+                        color = Color.BLACK
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, Color.WHITE)
+                    }
+                    else if (updateLock){
+                        color = tempWatchHandColor
+                        setShadowLayer(
+                            SHADOW_RADIUS, 0f, 0f, tempWatchHandShadowColor)
+                    }
+                }
             )
 
             /* Restore the canvas' original orientation. */
             canvas.restore()
+        }
+        
+        private fun timeZoneChanged(): Boolean{
+            val newTZ = TimeZone.getDefault()
+            if (mCalendar.timeZone != newTZ) {
+                mCalendar.timeZone = newTZ
+                return true
+            }
+            return false
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -600,7 +764,12 @@ class MyWatchFace : CanvasWatchFaceService() {
             if (visible) {
                 registerReceiver()
                 /* Update time zone in case it changed while we weren't visible. */
-                mCalendar.timeZone = TimeZone.getDefault()
+                if (timeZoneChanged()) {
+                    SkyImage.updateTZ()
+                    getLastLocation()
+                    updateBackground(priority=true)
+                }
+                updateBackground()
                 invalidate()
             } else {
                 unregisterReceiver()
