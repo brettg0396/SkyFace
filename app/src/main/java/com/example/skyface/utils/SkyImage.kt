@@ -14,6 +14,11 @@ import kotlin.math.roundToInt
 import android.graphics.PorterDuffXfermode
 import java.lang.Thread.sleep
 
+fun wrapMod(a: Float, b: Float): Float{
+    var r=a.rem(b)
+    if (r<0) return r+b
+    return r
+}
 
 class Sky(context: Context){
     private val gson = Gson()
@@ -77,7 +82,7 @@ class Sky(context: Context){
                 if (it.sys.sunrise*1000 != solar.dawn.set || it.sys.sunset*1000 != solar.dusk.set) {
                     updateSolar(it.sys.sunrise*1000, it.sys.sunset*1000, date.clone() as Calendar)
                 }
-                if (weatherCode != it.weather[0].id || true) {
+                if (weatherCode != it.weather[0].id) {
                     weatherCode = it.weather[0].id
                     updateEffects = true
                 }
@@ -178,18 +183,79 @@ class Sky(context: Context){
     private fun setEffects(maxWidth: Int, maxHeight: Int, defaultRecolor: Bitmap) {
         val windSpeed: Float = Weather?.wind?.speed ?: 3f
         val recolorImg: Bitmap
-        when (weatherCode) {
+        val vertRate: Float = maxHeight.toFloat()
+        val horRate: Float = maxWidth.toFloat()
+        val code = weatherCode
+        when (code) {
             in 200..232, in 502..511, in 602..611 -> {
                 recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_stormy)
                 effects = mutableListOf(
                 Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy3)), "cloud",  maxWidth,maxHeight, 0, windSpeed*1/3, recolorImg) ,
                 Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy2)), "cloud",  maxWidth,maxHeight, 0, windSpeed*2/3, recolorImg) ,
-                Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy1)), "cloud",  maxWidth,maxHeight, 0, windSpeed, recolorImg ),
-                Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.lightning1),
-                    BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.lightning2),
-                    BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.lightning3),
-                    BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.lightning4)), "lightning", maxWidth, maxHeight, isVisible=false)
+                Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy1)), "cloud",  maxWidth,maxHeight, 0, windSpeed, recolorImg )
                 )
+                when (code) {
+                    in 200..232 -> {
+                        effects.add(
+                            Effect(
+                                listOf(
+                                    BitmapFactory.decodeResource(
+                                        myContext.resources,
+                                        com.example.skyface.R.drawable.lightning1
+                                    ),
+                                    BitmapFactory.decodeResource(
+                                        myContext.resources,
+                                        com.example.skyface.R.drawable.lightning2
+                                    ),
+                                    BitmapFactory.decodeResource(
+                                        myContext.resources,
+                                        com.example.skyface.R.drawable.lightning3
+                                    ),
+                                    BitmapFactory.decodeResource(
+                                        myContext.resources,
+                                        com.example.skyface.R.drawable.lightning4
+                                    )
+                                ), "lightning", maxWidth, maxHeight, isVisible = false
+                            )
+                        )
+                        when (code) {
+                            200, in 231..232 -> effects.add(0,
+                                Effect(
+                                    listOf(
+                                        BitmapFactory.decodeResource(
+                                            myContext.resources,
+                                            com.example.skyface.R.drawable.light_rain
+                                        )
+                                    ), "cloud", maxWidth, maxHeight, 3, vertRate * 2, recolorImg
+                                )
+                            )
+                        }
+                        when (code) {
+                            201 -> effects.add(0,
+                                Effect(
+                                    listOf(
+                                        BitmapFactory.decodeResource(
+                                            myContext.resources,
+                                            com.example.skyface.R.drawable.rain
+                                        )
+                                    ), "cloud", maxWidth, maxHeight, 3, vertRate * 3, recolorImg
+                                )
+                            )
+                        }
+                        when (code) {
+                            202 -> effects.add(0,
+                                Effect(
+                                    listOf(
+                                        BitmapFactory.decodeResource(
+                                            myContext.resources,
+                                            com.example.skyface.R.drawable.heavy_rain
+                                        )
+                                    ), "cloud", maxWidth, maxHeight, 3, vertRate * 4, recolorImg
+                                )
+                            )
+                        }
+                    }
+                }
             }
             in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 804 -> {
                 recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_overcast)
@@ -198,6 +264,27 @@ class Sky(context: Context){
                     Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast2)), "cloud",  maxWidth,maxHeight, 0, windSpeed*2/3, recolorImg ),
                     Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast1)), "cloud",  maxWidth,maxHeight, 0, windSpeed, recolorImg )
                 )
+                when (code){
+                    in 301..310,500,520,531,615 -> {
+                        effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.light_rain)), "cloud", maxWidth, maxHeight, 3,vertRate*2, recolorImg))
+                        when (code) {
+                            615 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.snow)), "cloud", maxWidth, maxHeight, 3,vertRate/2, recolorImg))
+                        }
+                    }
+                    in 311..313,321,501,511,521,616 -> {
+                        effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.rain)), "cloud", maxWidth, maxHeight, 3,vertRate*3, recolorImg))
+                        when (code){
+                            616 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.snow)), "cloud", maxWidth, maxHeight, 3,vertRate/2, recolorImg))
+                        }
+                    }
+                    314, in 502..504,522 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.heavy_rain)), "cloud", maxWidth, maxHeight, 3,vertRate*4, recolorImg))
+                    600,620 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.light_snow)), "cloud", maxWidth, maxHeight, 3,vertRate/4, recolorImg))
+                    601,621 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.snow)), "cloud", maxWidth, maxHeight, 3,vertRate/2, recolorImg))
+                    602,622 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.heavy_snow)), "cloud", maxWidth, maxHeight, 3,vertRate, recolorImg))
+                    611 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.sleet)), "cloud", maxWidth, maxHeight, 3,vertRate*3, recolorImg))
+                    612 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.light_sleet)), "cloud", maxWidth, maxHeight, 3,vertRate*2, recolorImg))
+                    613 -> effects.add(0,Effect(listOf(BitmapFactory.decodeResource(myContext.resources,com.example.skyface.R.drawable.heavy_sleet)), "cloud", maxWidth, maxHeight, 3,vertRate*4, recolorImg))
+                }
             }
             801 -> {
                 recolorImg = defaultRecolor
@@ -401,16 +488,16 @@ class Sky(context: Context){
                 "cloud" -> {
                     if (visible) {
                         when (direction) {
-                            0 -> x = (x + (time - lastUpdate) * rate) % srcImage.width
-                            1 -> y = (y + (time - lastUpdate) * rate) % srcImage.height
-                            2 -> x = (x - (time - lastUpdate) * rate) % srcImage.width
-                            3 -> y = (y - (time - lastUpdate) * rate) % srcImage.height
-                            else -> x = (x + (time - lastUpdate) * rate) % srcImage.width
+                            0 -> x = wrapMod((x + (time - lastUpdate) * rate),srcImage.width.toFloat())
+                            1 -> y = wrapMod((y + (time - lastUpdate) * rate),srcImage.height.toFloat())
+                            2 -> x = wrapMod((x - (time - lastUpdate) * rate),srcImage.width.toFloat())
+                            3 -> y = wrapMod((y - (time - lastUpdate) * rate),srcImage.height.toFloat())
+                            else -> x = wrapMod((x + (time - lastUpdate) * rate),srcImage.width.toFloat())
                         }
                         lastUpdate = time
 
-                        val xInt = x.roundToInt() % srcImage.width
-                        val yInt = y.roundToInt() % srcImage.height
+                        val xInt = x.roundToInt().rem(srcImage.width)
+                        val yInt = y.roundToInt().rem(srcImage.height)
 
                         when (direction % 2) {
                             0 -> {
@@ -458,7 +545,7 @@ class Sky(context: Context){
 
                         val result = Bitmap.createBitmap(maxWidth, maxHeight, srcImage.config)
                         val canvas = Canvas(result)
-                        canvas.drawBitmap(srcImage,x%maxWidth,y,null)
+                        canvas.drawBitmap(srcImage,x.rem(maxWidth),y,null)
                         frame = result
                     }
                     else frame = getEmptyFrame()

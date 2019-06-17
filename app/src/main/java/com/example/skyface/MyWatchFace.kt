@@ -168,12 +168,6 @@ class MyWatchFace : CanvasWatchFaceService() {
             }
         }
 
-        inner class UpdateLocation: TimerTask(){
-            override fun run(){
-                getLastLocation()
-            }
-        }
-
         inner class LightningFlash: TimerTask(){
             override fun run(){
                 if ((Calendar.getInstance().timeInMillis < lastUpdate + 30000L) && SkyImage.hasEffect("lightning")) {
@@ -205,6 +199,13 @@ class MyWatchFace : CanvasWatchFaceService() {
             tempGrayBackgroundBitmap = mGrayBackgroundBitmap
         }
 
+        private fun shouldUpdate(): Boolean{
+            if ((Calendar.getInstance().timeInMillis > SkyImage.getDate()!!.timeInMillis + WEATHER_INTERVAL) || SkyImage.getLocation() == null){
+                return true
+            }
+            return false
+        }
+
         override fun onCreate(holder: SurfaceHolder) {
 
             super.onCreate(holder)
@@ -215,6 +216,7 @@ class MyWatchFace : CanvasWatchFaceService() {
 
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
+            getLastLocation()
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -225,8 +227,6 @@ class MyWatchFace : CanvasWatchFaceService() {
             mCalendar = Calendar.getInstance()
 
             clock.schedule(LightningFlash(),1000L,6000L)
-
-            clock.scheduleAtFixedRate(UpdateLocation(),0L,WEATHER_INTERVAL)
 
             initializeWatchFace()
             updateLock=true
@@ -264,7 +264,8 @@ class MyWatchFace : CanvasWatchFaceService() {
             if (timeZoneChanged()) {
                 SkyImage.updateTZ()
                 getLastLocation()
-            }
+            }else if (shouldUpdate())
+                getLastLocation()
 
             updateBackground()
         }
@@ -525,7 +526,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                     // TODO: Add code to handle the tap gesture.
                 {
                     val message: String = SkyImage.getWeather()?.let {
-                        "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}"
+                        "Location: ${it.name}\nWeather: ${it.weather[0].description}\nCode: ${it.weather[0].id}\nFetched: ${SkyImage.printTime(it.dt*1000)}\nLast Checked: ${(Calendar.getInstance().timeInMillis - SkyImage.getDate()!!.timeInMillis)/1000/60} minutes ago."
                     } ?: "Could not get location"
                         Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT)
                             .show()
@@ -768,7 +769,8 @@ class MyWatchFace : CanvasWatchFaceService() {
                     SkyImage.updateTZ()
                     getLastLocation()
                     updateBackground(priority=true)
-                }
+                } else if (shouldUpdate())
+                    getLastLocation()
                 updateBackground()
                 invalidate()
             } else {
