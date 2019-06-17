@@ -291,6 +291,7 @@ class MyWatchFace : CanvasWatchFaceService() {
                             SkyImage.setLocation(location)
                             SkyImage.setWeather()
                             SkyImage.setForecast()
+                            updateBackground(priority=true)
                         }
                         SkyImage.setDate()
                     }
@@ -768,7 +769,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                 if (timeZoneChanged()) {
                     SkyImage.updateTZ()
                     getLastLocation()
-                    updateBackground(priority=true)
                 } else if (shouldUpdate())
                     getLastLocation()
                 updateBackground()
