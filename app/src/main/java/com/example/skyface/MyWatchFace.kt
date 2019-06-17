@@ -289,9 +289,11 @@ class MyWatchFace : CanvasWatchFaceService() {
                         if (location != null) {
                             myLocation = location
                             SkyImage.setLocation(location)
-                            SkyImage.setWeather()
-                            SkyImage.setForecast()
-                            updateBackground(priority=true)
+                            doAsync {
+                                SkyImage.setWeather()
+                                SkyImage.setForecast()
+                                updateBackground(priority = true)
+                            }
                         }
                         SkyImage.setDate()
                     }

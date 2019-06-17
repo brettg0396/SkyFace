@@ -620,17 +620,13 @@ class Sky(context: Context){
     }
 
     fun setWeather(){
-        doAsync{
-            val weather_url: String = URL_Builder.getWeather(myLocation!!.latitude, myLocation!!.longitude)
-            Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
-        }
+        val weather_url: String = URL_Builder.getWeather(myLocation!!.latitude, myLocation!!.longitude)
+        Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
     }
 
     fun setForecast(){
-        doAsync {
-            val forecast_url: String = URL_Builder.getForecast(myLocation!!.latitude, myLocation!!.longitude)
-            Forecast = gson.fromJson(URL(forecast_url).readText(), ForecastData::class.java)
-        }
+        val forecast_url: String = URL_Builder.getForecast(myLocation!!.latitude, myLocation!!.longitude)
+        Forecast = gson.fromJson(URL(forecast_url).readText(), ForecastData::class.java)
     }
 
     fun getDate(): Calendar?{
@@ -650,9 +646,7 @@ class Sky(context: Context){
     }
 
     fun testWeather(latitude: Double, longitude: Double){
-        doAsync {
-            val weather_url: String = URL_Builder.getWeather(latitude, longitude)
-            Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
-        }
+        val weather_url: String = URL_Builder.getWeather(latitude, longitude)
+        Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
     }
 }
