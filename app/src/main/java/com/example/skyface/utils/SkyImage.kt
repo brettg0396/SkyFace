@@ -73,6 +73,7 @@ class Sky(context: Context){
 
         val starImg: Bitmap = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stars)
         var seasonImg: Bitmap
+        val recolorImg: Bitmap
 
         var updateEffects = false
 
@@ -92,28 +93,36 @@ class Sky(context: Context){
         when(weatherCode) {
             in 200..232, in 502..511, in 602..611 -> {
                 seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_stormy)
+                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_stormy)
             }
             in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 804 -> {
                 seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_overcast)
+                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_overcast)
             }
             else -> when (date.get(Calendar.MONTH)) {
                 in 0..1 -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_winter)
                 }
                 in 2..4 -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_spring)
                 }
                 in 5..7 -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_summer)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_summer)
                 }
                 in 8..10 -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_fall)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_fall)
                 }
                 11 -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_winter)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_winter)
                 }
                 else -> {
                     seasonImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.sky_spring)
+                    recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_spring)
                 }
             }
         }
@@ -137,8 +146,7 @@ class Sky(context: Context){
             else -> 0
         }
 
-
-        if (updateEffects) setEffects(starImg.width,starImg.height,seasonImg)
+        if (updateEffects) setEffects(starImg.width,starImg.height,recolorImg)
 
         seasonImg = Bitmap.createBitmap(seasonImg, 0, time,skyWidth, skyWidth)
         val result = Bitmap.createBitmap(starImg.width, starImg.height, starImg.config)
@@ -188,7 +196,7 @@ class Sky(context: Context){
         val code = weatherCode
         when (code) {
             in 200..232, in 502..511, in 602..611 -> {
-                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_stormy)
+                recolorImg = defaultRecolor
                 effects = mutableListOf(
                 Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy3)), "cloud",  maxWidth,maxHeight, 0, windSpeed*1/3, recolorImg) ,
                 Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.stormy2)), "cloud",  maxWidth,maxHeight, 0, windSpeed*2/3, recolorImg) ,
@@ -219,7 +227,7 @@ class Sky(context: Context){
                             )
                         )
                         when (code) {
-                            200, in 231..232 -> effects.add(0,
+                            200, 231, 232 -> effects.add(0,
                                 Effect(
                                     listOf(
                                         BitmapFactory.decodeResource(
@@ -258,7 +266,7 @@ class Sky(context: Context){
                 }
             }
             in 300..321, 500, 501, in 520..531, in 600..601, in 612..622, in 701..781, 804 -> {
-                recolorImg = BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.clouds_overcast)
+                recolorImg = defaultRecolor
                 effects = mutableListOf(
                     Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast3)), "cloud",  maxWidth,maxHeight, 0, windSpeed*1/3, recolorImg ),
                     Effect(listOf(BitmapFactory.decodeResource(myContext.resources, com.example.skyface.R.drawable.overcast2)), "cloud",  maxWidth,maxHeight, 0, windSpeed*2/3, recolorImg ),
@@ -646,7 +654,9 @@ class Sky(context: Context){
     }
 
     fun testWeather(latitude: Double, longitude: Double){
-        val weather_url: String = URL_Builder.getWeather(latitude, longitude)
-        Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
+        doAsync {
+            val weather_url: String = URL_Builder.getWeather(latitude, longitude)
+            Weather = gson.fromJson(URL(weather_url).readText(), WeatherData::class.java)
+        }
     }
 }

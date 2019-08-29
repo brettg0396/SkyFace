@@ -216,7 +216,6 @@ class MyWatchFace : CanvasWatchFaceService() {
 
 
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(applicationContext)
-            getLastLocation()
 
             setWatchFaceStyle(
                 WatchFaceStyle.Builder(this@MyWatchFace)
@@ -234,6 +233,7 @@ class MyWatchFace : CanvasWatchFaceService() {
             initGrayBackgroundBitmap()
             updateLock=false
             setTemps()
+            getLastLocation()
         }
 
         private fun updateBackground(priority: Boolean=false){
@@ -286,6 +286,7 @@ class MyWatchFace : CanvasWatchFaceService() {
             if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 fusedLocationClient.lastLocation
                     .addOnSuccessListener { location: Location? ->
+                        SkyImage.setDate()
                         if (location != null) {
                             myLocation = location
                             SkyImage.setLocation(location)
@@ -295,7 +296,6 @@ class MyWatchFace : CanvasWatchFaceService() {
                                 updateBackground(priority = true)
                             }
                         }
-                        SkyImage.setDate()
                     }
             }
         }
